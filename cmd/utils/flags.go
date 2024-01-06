@@ -848,6 +848,11 @@ var (
 		Usage: "Comma separated list of support session ids to connect to",
 	}
 
+	SilkwormLibraryPathFlag = cli.StringFlag{
+		Name:  "silkworm.libpath",
+		Usage: "Path to the Silkworm library",
+		Value: "",
+	}
 	SilkwormExecutionFlag = cli.BoolFlag{
 		Name:  "silkworm.exec",
 		Usage: "Enable Silkworm block execution",
@@ -860,7 +865,6 @@ var (
 		Name:  "silkworm.sentry",
 		Usage: "Enable embedded Silkworm Sentry service",
 	}
-
 	BeaconAPIFlag = cli.BoolFlag{
 		Name:  "beacon.api",
 		Usage: "Enable beacon API",
@@ -1563,7 +1567,10 @@ func setCaplin(ctx *cli.Context, cfg *ethconfig.Config) {
 }
 
 func setSilkworm(ctx *cli.Context, cfg *ethconfig.Config) {
-	cfg.SilkwormExecution = ctx.Bool(SilkwormExecutionFlag.Name)
+	cfg.SilkwormLibraryPath = ctx.String(SilkwormLibraryPathFlag.Name)
+	if ctx.IsSet(SilkwormExecutionFlag.Name) {
+		cfg.SilkwormExecution = ctx.Bool(SilkwormExecutionFlag.Name)
+	}
 	cfg.SilkwormRpcDaemon = ctx.Bool(SilkwormRpcDaemonFlag.Name)
 	cfg.SilkwormSentry = ctx.Bool(SilkwormSentryFlag.Name)
 }
