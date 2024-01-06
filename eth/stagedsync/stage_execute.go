@@ -467,7 +467,7 @@ Loop:
 
 		_, isMemoryMutation := txc.Tx.(*membatchwithdb.MemoryMutation)
 		if cfg.silkworm != nil && !isMemoryMutation {
-			blockNum, err = silkworm.ExecuteBlocks(cfg.silkworm, txc.Tx, cfg.chainConfig.ChainID, blockNum, to, uint64(cfg.batchSize), writeChangeSets, writeReceipts, writeCallTraces)
+			blockNum, err = cfg.silkworm.ExecuteBlocks(txc.Tx, cfg.chainConfig.ChainID, blockNum, to, uint64(cfg.batchSize), writeChangeSets, writeReceipts, writeCallTraces)
 		} else {
 			err = executeBlock(block, txc.Tx, batch, cfg, *cfg.vmConfig, writeChangeSets, writeReceipts, writeCallTraces, stateStream, logger)
 		}
