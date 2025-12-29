@@ -27,6 +27,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -871,6 +872,15 @@ func (a *Aggregator) RemoveOverlapsAfterMerge(ctx context.Context) (err error) {
 	return nil
 }
 
+func getMergeThrottleMs() int {
+	if v := os.Getenv("ERIGON_MERGE_THROTTLE_MS"); v != "" {
+		if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
+			return ms
+		}
+	}
+	return 0
+}
+
 func (a *Aggregator) MergeLoop(ctx context.Context) (err error) {
 	if dbg.NoMerge() || !a.mergingFiles.CompareAndSwap(false, true) {
 		return nil // currently merging or merge is prohibited
@@ -888,6 +898,11 @@ func (a *Aggregator) MergeLoop(ctx context.Context) (err error) {
 	defer a.wg.Done()
 	defer a.mergingFiles.Store(false)
 
+	mergeThrottleMs := getMergeThrottleMs()
+	if mergeThrottleMs > 0 {
+		log.Info("[snapshots] MergeLoop throttle enabled", "delay_ms", mergeThrottleMs)
+	}
+
 	for {
 		somethingMerged, err := a.mergeLoopStep(ctx, a.visibleFilesMinimaxTxNum.Load())
 		if err != nil {
@@ -895,6 +910,14 @@ func (a *Aggregator) MergeLoop(ctx context.Context) (err error) {
 		}
 		if !somethingMerged {
 			return nil
+		}
+
+		if mergeThrottleMs > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Duration(mergeThrottleMs) * time.Millisecond):
+			}
 		}
 	}
 }
