@@ -240,6 +240,12 @@ Loop:
 	return int(createdAmount.Load()), nil
 }
 
+const (
+	// ErigonGenesisTimestamp is the Unix timestamp of Erigon's first commit
+	// (Thu Dec 26 12:45:52 2013 +0100). Used for reproducible torrent generation.
+	ErigonGenesisTimestamp int64 = 1388058352
+)
+
 func CreateMetaInfo(info *metainfo.Info, mi *metainfo.MetaInfo) (*metainfo.MetaInfo, error) {
 	if mi == nil {
 		infoBytes, err := bencode.Marshal(info)
@@ -247,13 +253,14 @@ func CreateMetaInfo(info *metainfo.Info, mi *metainfo.MetaInfo) (*metainfo.MetaI
 			return nil, err
 		}
 		mi = &metainfo.MetaInfo{
-			CreationDate: time.Now().Unix(),
+			CreationDate: ErigonGenesisTimestamp,
 			// TODO: Differentiate direct web source vs generated locally.
 			CreatedBy:    "erigon",
 			InfoBytes:    infoBytes,
 			AnnounceList: Trackers,
 		}
 	} else {
+		mi.CreationDate = ErigonGenesisTimestamp
 		mi.AnnounceList = Trackers
 	}
 	return mi, nil
