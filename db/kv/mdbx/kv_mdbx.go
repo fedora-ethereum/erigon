@@ -94,14 +94,9 @@ const DefaultMapSize = 2 * datasize.TB
 const DefaultGrowthStep = 1 * datasize.GB
 
 func New(label kv.Label, log log.Logger) MdbxOpts {
-	var syncMode uint = mdbx.Durable
-	if os.Getenv("ERIGON_MDBX_NOSYNC") == "1" {
-		syncMode = mdbx.SafeNoSync
-	}
-
 	opts := MdbxOpts{
 		bucketsCfg: WithChaindataTables,
-		flags:      mdbx.NoReadahead | syncMode,
+		flags:      mdbx.NoReadahead | mdbx.Durable,
 		log:        log,
 		pageSize:   kv.DefaultPageSize(),
 
