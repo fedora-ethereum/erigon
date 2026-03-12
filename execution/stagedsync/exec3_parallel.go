@@ -111,7 +111,9 @@ func (pe *parallelExecutor) exec(ctx context.Context, execStage *StageState, u U
 		return nil, rwTx, fmt.Errorf("expected *temporal.RwTx: got %T", rwTx)
 	}
 
-	applyResults := make(chan applyResult, 100_000)
+	// applyResults receives completed block/tx results from execLoop for the apply goroutine.
+	// Keep bounded to avoid accumulating large result objects ahead of the apply loop.
+	applyResults := make(chan applyResult, 2_048)
 
 	if blockLimit > 0 && min(startBlockNum+blockLimit, maxBlockNum) > startBlockNum+16 || maxBlockNum > startBlockNum+16 {
 		log.Info(fmt.Sprintf("[%s] parallel starting", execStage.LogPrefix()),
@@ -559,8 +561,23 @@ func (pe *parallelExecutor) execLoop(ctx context.Context) (err error) {
 			return err
 		}
 
+		// Limit how many blocks can be pending in pe.blockExecutors simultaneously.
+		// processRequest is non-blocking (it just stores blocks in the map), so
+		// without this check execRequests drains instantly and pe.blockExecutors
+		// grows unbounded — holding all decoded TxTask objects in RAM.
+		// Setting pendingCh to nil causes the select to skip that case entirely,
+		// applying backpressure that propagates to executeBlocks.func1.
+		const maxPendingBlocks = 32
+		pe.RLock()
+		pendingBlocks := len(pe.blockExecutors)
+		pe.RUnlock()
+		var pendingCh chan *execRequest
+		if pendingBlocks < maxPendingBlocks {
+			pendingCh = pe.execRequests
+		}
+
 		select {
-		case exec := <-pe.execRequests:
+		case exec := <-pendingCh:
 			if err := pe.processRequest(ctx, exec); err != nil {
 				return err
 			}
@@ -859,8 +876,14 @@ func (pe *parallelExecutor) processResults(ctx context.Context, applyTx kv.Tempo
 }
 
 func (pe *parallelExecutor) run(ctx context.Context) (context.Context, context.CancelFunc, error) {
-	pe.execRequests = make(chan *execRequest, 100_000)
-	pe.in = exec.NewQueueWithRetry(100_000)
+	// execRequests holds one entry per decoded block (each containing all its TxTasks).
+	// A large buffer causes the block-loader goroutine to race far ahead of the apply
+	// loop, accumulating all decoded transaction objects in memory simultaneously.
+	// 128 blocks (~25 k txns on mainnet) is sufficient to keep workers busy.
+	pe.execRequests = make(chan *execRequest, 128)
+	// in is the per-transaction work queue consumed by OCC workers.
+	// 2048 entries keeps all workers saturated without unbounded accumulation.
+	pe.in = exec.NewQueueWithRetry(2_048)
 
 	pe.taskExecMetrics = exec.NewWorkerMetrics()
 	pe.blockExecMetrics = newBlockExecMetrics()
