@@ -412,10 +412,10 @@ func TestRecoverSignerFromRLP_ValidData(t *testing.T) {
 	authLen := rlp.U64Len(chainID)
 	authLen += 1 + length.Addr
 	authLen += rlp.U64Len(0) // nonce
-	require.NoError(t, rlp.EncodeStructSizePrefix(authLen, data, b[:]))
-	require.NoError(t, rlp.EncodeInt(chainID, data, b[:]))
-	require.NoError(t, rlp.EncodeOptionalAddress(&pubKey, data, b[:]))
-	require.NoError(t, rlp.EncodeInt(0, data, b[:]))
+	require.NoError(t, rlp.EncodeListPrefix(authLen, data, b[:]))
+	require.NoError(t, rlp.EncodeU64(chainID, data, b[:]))
+	require.NoError(t, types.EncodeOptionalAddress(&pubKey, data, b[:]))
+	require.NoError(t, rlp.EncodeU64(0, data, b[:]))
 
 	// Prepare hash data exactly as before
 	hashData := []byte{params.SetCodeMagicPrefix}
