@@ -153,9 +153,12 @@ func NewType(t string, internalType string, components []ArgumentMarshaling) (ty
 	case "string":
 		typ.T = StringTy
 	case "bytes":
-		if varSize == 0 {
+		if varSize == 0 && len(parsedType[3]) == 0 {
 			typ.T = BytesTy
 		} else {
+			if varSize == 0 || varSize > 32 {
+				return Type{}, fmt.Errorf("unsupported arg type: %s", t)
+			}
 			typ.T = FixedBytesTy
 			typ.Size = varSize
 		}
